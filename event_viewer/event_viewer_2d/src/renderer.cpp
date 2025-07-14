@@ -1,4 +1,3 @@
-// stb_image.hの実装を定義(必ず他のincludeより前に記述)
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
@@ -13,31 +12,17 @@
 #include <sstream>
 #include <vector>
 #include <cmath>
-#include <cstdio> // printfのため
+#include <cstdio>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
 // --- 状態管理用変数 ---
-// オービットカメラ
-float camera_azimuth = -135.0f;
-float camera_elevation = -30.0f;
-float camera_radius = 4.0f;
-glm::vec3 camera_target = glm::vec3(0.0f, 0.0f, 0.0f);
-// マウス入力
-bool is_mouse_dragging = false;
-double last_x = 0.0, last_y = 0.0;
-// 輪郭表示フラグ
-bool show_bounding_box = true;
-
 // 再生制御用の変数
 float playback_speed = 1.0f;
 double current_time_us = 0.0;
 bool is_paused = false;
-
-// 奥行き制御用の変数
-float depth_scale = 1.0f;
 
 // 表示モードを管理するための列挙型と変数
 enum class DisplayMode {
@@ -46,18 +31,16 @@ enum class DisplayMode {
     RGB_ONLY
 };
 DisplayMode current_display_mode = DisplayMode::EVENTS_AND_RGB;
-float image_alpha = 0.8f;
+float image_alpha = 0.8f; // イベント描画時の透明度
 
 // 表示時間幅を管理する変数
-double time_window_us = 2000000.0; // デフォルトは2秒
+double time_window_us = 2000000.0;
+
 
 // --- GLFWコールバック関数 ---
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
         glfwSetWindowShouldClose(window, true);
-    }
-    if (key == GLFW_KEY_B && action == GLFW_PRESS) {
-        show_bounding_box = !show_bounding_box;
     }
 
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
@@ -78,24 +61,24 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         }
     }
 
-    if (key == GLFW_KEY_RIGHT_BRACKET && (action == GLFW_PRESS || action == GLFW_REPEAT)) { // ']' key
+    if (key == GLFW_KEY_RIGHT_BRACKET && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         image_alpha += 0.05f;
         if (image_alpha > 1.0f) image_alpha = 1.0f;
-        printf("Image Alpha: %.2f\n", image_alpha);
+        printf("Event Alpha: %.2f\n", image_alpha);
     }
-    if (key == GLFW_KEY_LEFT_BRACKET && (action == GLFW_PRESS || action == GLFW_REPEAT)) { // '[' key
+    if (key == GLFW_KEY_LEFT_BRACKET && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         image_alpha -= 0.05f;
         if (image_alpha < 0.0f) image_alpha = 0.0f;
-        printf("Image Alpha: %.2f\n", image_alpha);
+        printf("Event Alpha: %.2f\n", image_alpha);
     }
 
-    if (key == GLFW_KEY_PERIOD && (action == GLFW_PRESS || action == GLFW_REPEAT)) { // '.' key
+    if (key == GLFW_KEY_PERIOD && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         time_window_us *= 1.2;
         printf("Time Window: %.2f s\n", time_window_us / 1000000.0);
     }
-    if (key == GLFW_KEY_COMMA && (action == GLFW_PRESS || action == GLFW_REPEAT)) { // ',' key
+    if (key == GLFW_KEY_COMMA && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
         time_window_us /= 1.2;
-        if (time_window_us < 10000) time_window_us = 10000; // 10ms未満にはしない
+        if (time_window_us < 10000) time_window_us = 10000;
         printf("Time Window: %.2f s\n", time_window_us / 1000000.0);
     }
 
@@ -110,53 +93,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
                 playback_speed /= 1.2f;
                 updated = true;
                 break;
-            case GLFW_KEY_UP:
-                depth_scale *= 1.2f;
-                updated = true;
-                break;
-            case GLFW_KEY_DOWN:
-                depth_scale /= 1.2f;
-                if (depth_scale < 0.01f) depth_scale = 0.01f;
-                updated = true;
-                break;
         }
-        if(updated){
-             printf("Speed: %.2fx, Depth Scale: %.2f\n", playback_speed, depth_scale);
+        if (updated) {
+            printf("Speed: %.2fx\n", playback_speed);
         }
     }
-}
-
-void mouse_button_callback(GLFWwindow* window, int button, int action, int mods) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (action == GLFW_PRESS) {
-            is_mouse_dragging = true;
-            glfwGetCursorPos(window, &last_x, &last_y);
-        } else if (action == GLFW_RELEASE) {
-            is_mouse_dragging = false;
-        }
-    }
-}
-
-void cursor_position_callback(GLFWwindow* window, double xpos, double ypos) {
-    if (!is_mouse_dragging) return;
-
-    float xoffset = xpos - last_x;
-    float yoffset = ypos - last_y;
-    last_x = xpos;
-    last_y = ypos;
-
-    float sensitivity = 0.2f;
-    camera_azimuth += xoffset * sensitivity;
-    camera_elevation += yoffset * sensitivity;
-
-    if (camera_elevation > 89.0f) camera_elevation = 89.0f;
-    if (camera_elevation < -89.0f) camera_elevation = -89.0f;
-}
-
-void scroll_callback(GLFWwindow* window, double xoffset, double yoffset) {
-    camera_radius -= (float)yoffset * 0.2f;
-    if (camera_radius < 1.0f) camera_radius = 1.0f;
-    if (camera_radius > 20.0f) camera_radius = 20.0f;
 }
 
 
@@ -236,45 +177,54 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    GLFWwindow* window = glfwCreateWindow(1280, 720, "Event Viewer", NULL, NULL);
+    GLFWwindow* window = glfwCreateWindow(width, height, "Event Viewer 2D", NULL, NULL);
     if (!window) { glfwTerminate(); return; }
     glfwMakeContextCurrent(window);
-    glViewport(0, 0, 1280, 720);
+    glViewport(0, 0, width, height);
 
     glfwSetKeyCallback(window, key_callback);
-    glfwSetMouseButtonCallback(window, mouse_button_callback);
-    glfwSetCursorPosCallback(window, cursor_position_callback);
-    glfwSetScrollCallback(window, scroll_callback);
 
     if (glewInit() != GLEW_OK) { return; }
     init_cuda_for_gl();
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
-    std::cout << "\n--- Viewer Controls ---\n"
-              << "Mouse Drag: Orbit camera\n"
-              << "Mouse Wheel: Zoom in/out\n"
-              << "-----------------------\n"
-              << "B key: Toggle bounding box\n"
+    std::cout << "\n--- 2D Viewer Controls ---\n"
               << "M key: Cycle display mode (All / Events / RGB)\n"
               << "SPACE key: Pause / Resume\n"
               << "RIGHT/LEFT arrow: Speed up / Slow down\n"
-              << "UP/DOWN arrow: Stretch / Squeeze depth\n"
-              << "+/- key: Adjust RGB frame alpha\n"
-              << "PageUp/PageDown: Change time window duration\n"
-              << "-----------------------\n"
+              << "]/[ key: Adjust Event point alpha\n"
+              << "./, key: Change time window duration\n"
               << "ESC key: Exit\n"
               << "-----------------------\n" << std::endl;
 
     // --- シェーダープログラムの読み込み ---
     GLuint pointShaderProgram = LoadShaders("shaders/simple.vert", "shaders/simple.frag");
-    GLuint boxShaderProgram = LoadShaders("shaders/box.vert", "shaders/box.frag");
     GLuint imageShaderProgram = LoadShaders("shaders/image.vert", "shaders/image.frag");
     
     // --- イベントデータの準備 ---
     unsigned int point_count = 0;
     GLuint pointVao = 0, pointVbo = 0;
     double base_time = 0;
+
+    // ===== ここからデバッグコードを追加 =====
+    if (!all_events.empty()) {
+        std::cout << "\n--- Timestamp Sanity Check ---" << std::endl;
+        if (all_events.size() > 20) {
+            std::cout << "First 10 event timestamps (us):" << std::endl;
+            for (size_t i = 0; i < 10; ++i) {
+                std::cout << "Event[" << i << "]: " << all_events[i].t << std::endl;
+            }
+        }
+        std::cout << "..." << std::endl;
+        std::cout << "Last event timestamp (us): " << all_events.back().t << std::endl;
+
+        // イベント全体の記録時間を計算
+        double duration_sec = static_cast<double>(all_events.back().t - all_events[0].t) / 1000000.0;
+        std::cout << "Total event stream duration: " << duration_sec << " seconds" << std::endl;
+        std::cout << "----------------------------\n" << std::endl;
+    }
+    // ===== ここまでデバッグコード =====
 
     if (!all_events.empty()) {
         base_time = static_cast<double>(t_offset) + all_events[0].t;
@@ -297,38 +247,14 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
         glBindVertexArray(0);
     }
     
-    // --- バウンディングボックスの準備 ---
-    float box_vertices[] = {
-        -1.0f, -1.0f, -1.0f, 1.0f, -1.0f, -1.0f, 1.0f,  1.0f, -1.0f, -1.0f,  1.0f, -1.0f,
-        -1.0f, -1.0f,  1.0f, 1.0f, -1.0f,  1.0f, 1.0f,  1.0f,  1.0f, -1.0f,  1.0f,  1.0f,
-    };
-    unsigned int box_indices[] = {
-        0, 1, 1, 2, 2, 3, 3, 0, 4, 5, 5, 6, 6, 7, 7, 4, 0, 4, 1, 5, 2, 6, 3, 7
-    };
-    GLuint boxVao, boxVbo, boxEbo;
-    glGenVertexArrays(1, &boxVao);
-    glGenBuffers(1, &boxVbo);
-    glGenBuffers(1, &boxEbo);
-    glBindVertexArray(boxVao);
-    glBindBuffer(GL_ARRAY_BUFFER, boxVbo);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(box_vertices), box_vertices, GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, boxEbo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(box_indices), box_indices, GL_STATIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
-
     // --- 画像描画用のクアッド(板ポリゴン)を準備 ---
     float quad_vertices[] = {
-        // positions      // texture Coords
-        -1.0f,  1.0f, 0.0f,  0.0f, 1.0f,
-        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
-         1.0f, -1.0f, 0.0f,  1.0f, 0.0f,
-         1.0f,  1.0f, 0.0f,  1.0f, 1.0f
+        -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+         1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+         1.0f,  1.0f, 0.0f, 1.0f, 1.0f
     };
-    unsigned int quad_indices[] = {  
-        0, 1, 2, 0, 2, 3
-    };
+    unsigned int quad_indices[] = { 0, 1, 2, 0, 2, 3 };
     GLuint quadVao, quadVbo, quadEbo;
     glGenVertexArrays(1, &quadVao);
     glGenBuffers(1, &quadVbo);
@@ -355,16 +281,11 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
                 GLuint textureID;
                 glGenTextures(1, &textureID);
                 glBindTexture(GL_TEXTURE_2D, textureID);
-                
                 GLenum format = (img_channels == 4) ? GL_RGBA : GL_RGB;
                 glTexImage2D(GL_TEXTURE_2D, 0, format, img_width, img_height, 0, format, GL_UNSIGNED_BYTE, data);
                 glGenerateMipmap(GL_TEXTURE_2D);
-
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-                
                 image_texture_ids.push_back(textureID);
                 stbi_image_free(data);
             } else {
@@ -390,20 +311,44 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
             current_time_us += delta_time * 1000000.0 * playback_speed;
         }
 
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // --- 行列の計算 ---
+        glm::mat4 projection = glm::ortho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
         glm::mat4 view = glm::mat4(1.0f);
-        view = glm::translate(view, glm::vec3(0.0f, 0.0f, -camera_radius));
-        view = glm::rotate(view, glm::radians(camera_elevation), glm::vec3(1.0f, 0.0f, 0.0f));
-        view = glm::rotate(view, glm::radians(camera_azimuth), glm::vec3(0.0f, 1.0f, 0.0f));
-        view = glm::translate(view, -camera_target);
+        glm::mat4 model = glm::mat4(1.0f);
 
-        glm::mat4 projection = glm::perspective(glm::radians(45.0f), 1280.0f / 720.0f, 0.1f, 100.0f);
+        // --- 背景画像の描画 ---
+        bool rgb_drawn = false;
+        if (!all_images.empty() && (current_display_mode == DisplayMode::RGB_ONLY || current_display_mode == DisplayMode::EVENTS_AND_RGB)) {
+            int latest_image_idx = -1;
+            for (size_t i = 0; i < all_images.size(); ++i) {
+                if (all_images[i].timestamp <= current_time_us) {
+                    latest_image_idx = i;
+                } else {
+                    break;
+                }
+            }
+
+            if (latest_image_idx != -1) {
+                glUseProgram(imageShaderProgram);
+                glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
+                glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
+                glm::mat4 image_model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+                glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(image_model));
+                glUniform1f(glGetUniformLocation(imageShaderProgram, "u_alpha"), 1.0f);
+                
+                glDisable(GL_BLEND);
+                glBindVertexArray(quadVao);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, image_texture_ids[latest_image_idx]);
+                glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+                glBindVertexArray(0);
+                rgb_drawn = true;
+            }
+        }
         
-        glm::mat4 model = glm::scale(glm::mat4(1.0f), glm::vec3(1.0f, 1.0f, depth_scale));
-
         // --- イベントの描画 ---
         if (point_count > 0 && (current_display_mode == DisplayMode::EVENTS_ONLY || current_display_mode == DisplayMode::EVENTS_AND_RGB)) {
             glUseProgram(pointShaderProgram);
@@ -414,58 +359,14 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
             float relative_u_time = static_cast<float>(current_time_us - base_time);
             glUniform1f(glGetUniformLocation(pointShaderProgram, "u_time"), relative_u_time);
             glUniform1f(glGetUniformLocation(pointShaderProgram, "u_max_age"), (float)time_window_us);
-
-            glDisable(GL_BLEND);
+            
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE); // 加算ブレンド
+            
             glBindVertexArray(pointVao);
             glDrawArrays(GL_POINTS, 0, point_count);
             glBindVertexArray(0);
-        }
-
-        // --- 画像フレームの描画 ---
-        if (!all_images.empty() && (current_display_mode == DisplayMode::RGB_ONLY || current_display_mode == DisplayMode::EVENTS_AND_RGB)) {
-            glUseProgram(imageShaderProgram);
-            glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-            glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-            glUniform1f(glGetUniformLocation(imageShaderProgram, "u_alpha"), image_alpha);
-
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            
-            glBindVertexArray(quadVao);
-            for (size_t i = 0; i < all_images.size(); ++i) {
-                if (i >= image_texture_ids.size()) continue;
-
-                double image_age = current_time_us - all_images[i].timestamp;
-                
-                if (image_age > 0 && image_age < time_window_us) {
-                    float normalized_age = image_age / time_window_us;
-                    float display_z = 1.0f - 2.0f * normalized_age;
-                    
-                    glm::mat4 image_translate_model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, display_z));
-                    glm::mat4 final_image_model = model * image_translate_model;
-                    
-                    glUniformMatrix4fv(glGetUniformLocation(imageShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(final_image_model));
-
-                    glActiveTexture(GL_TEXTURE0);
-                    glBindTexture(GL_TEXTURE_2D, image_texture_ids[i]);
-                    
-                    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-                }
-            }
-            glBindVertexArray(0);
             glDisable(GL_BLEND);
-        }
-        
-        // --- バウンディングボックスの描画 ---
-        if (show_bounding_box) {
-            glUseProgram(boxShaderProgram);
-            glUniformMatrix4fv(glGetUniformLocation(boxShaderProgram, "projection"), 1, GL_FALSE, glm::value_ptr(projection));
-            glUniformMatrix4fv(glGetUniformLocation(boxShaderProgram, "view"), 1, GL_FALSE, glm::value_ptr(view));
-            glUniformMatrix4fv(glGetUniformLocation(boxShaderProgram, "model"), 1, GL_FALSE, glm::value_ptr(model));
-
-            glBindVertexArray(boxVao);
-            glDrawElements(GL_LINES, 24, GL_UNSIGNED_INT, 0);
-            glBindVertexArray(0);
         }
         
         glfwSwapBuffers(window);
@@ -485,11 +386,7 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
         glDeleteBuffers(1, &pointVbo);
         glDeleteVertexArrays(1, &pointVao);
     }
-    glDeleteBuffers(1, &boxVbo);
-    glDeleteBuffers(1, &boxEbo);
-    glDeleteVertexArrays(1, &boxVao);
     glDeleteProgram(pointShaderProgram);
-    glDeleteProgram(boxShaderProgram);
 
     glfwDestroyWindow(window);
     glfwTerminate();

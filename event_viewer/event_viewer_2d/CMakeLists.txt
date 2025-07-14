@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.10)
-project(EventViewer LANGUAGES C CXX CUDA)
+project(EventViewer2D LANGUAGES C CXX CUDA)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -20,7 +20,7 @@ find_package(HDF5 REQUIRED COMPONENTS C CXX)
 include_directories(include)
 
 # 実行可能ファイルを作成
-add_executable(event_viewer
+add_executable(event_viewer_2d
     src/main.cpp
     src/hdf5_loader.cpp
     src/cuda_processor.cu
@@ -32,10 +32,10 @@ add_executable(event_viewer
 file(COPY shaders DESTINATION ${CMAKE_BINARY_DIR})
 
 # HDF5のインクルードディレクトリをターゲットに追加
-target_include_directories(event_viewer PRIVATE ${HDF5_INCLUDE_DIRS})
+target_include_directories(event_viewer_2d PRIVATE ${HDF5_INCLUDE_DIRS})
 
 # 必要なライブラリをリンク
-target_link_libraries(event_viewer
+target_link_libraries(event_viewer_2d
     PRIVATE
     ${HDF5_LIBRARIES}
     dl z m
