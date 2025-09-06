@@ -1,24 +1,22 @@
 #pragma once
 #include <string>
 #include <vector>
-#include <cstdint>
+#include <filesystem>
+#include "types.h" 
 
-// 1フレームの画像情報を保持する構造体
-struct RGBFrame {
-    int64_t timestamp;      // タイムスタンプ (us)
-    std::string image_path; // 画像ファイルのフルパス
+// ImageLoaderに必要な設定をまとめた構造体
+struct ImageLoaderConfig {
+    fs::path timestamps_path;
+    fs::path images_dir_path;
+    std::string image_extension;
 };
 
 class ImageLoader {
 public:
-    // コンストラクタ：画像データセットのベースパスを受け取る
-    ImageLoader(const std::string& base_path);
+    explicit ImageLoader(const ImageLoaderConfig& config);
 
-    // タイムスタンプと画像パスを読み込んで、そのリストを返す
     std::vector<RGBFrame> load_image_data();
 
 private:
-    std::string base_path_;
-    std::string timestamps_path_;
-    std::string images_dir_path_;
+    ImageLoaderConfig config_; 
 };

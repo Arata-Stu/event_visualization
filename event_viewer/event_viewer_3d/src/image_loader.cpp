@@ -4,23 +4,20 @@
 #include <vector>
 #include <string>
 #include <algorithm>
-#include <filesystem> // C++17のfilesystemライブラリを使用
 
 namespace fs = std::filesystem;
 
-ImageLoader::ImageLoader(const std::string& base_path) : base_path_(base_path) {
-    timestamps_path_ = fs::path(base_path_) / "timestamps.txt";
-    images_dir_path_ = fs::path(base_path_) / "left" / "distorted";
-}
+// コンストラクタは、main関数で組み立てられた設定構造体をメンバ変数にコピーします
+ImageLoader::ImageLoader(const ImageLoaderConfig& config) : config_(config) {}
 
 std::vector<RGBFrame> ImageLoader::load_image_data() {
     std::vector<RGBFrame> frames;
 
     // 1. timestamps.txt からタイムスタンプを読み込む
     std::vector<int64_t> timestamps;
-    std::ifstream ts_file(timestamps_path_);
+    std::ifstream ts_file(config_.timestamps_path);
     if (!ts_file.is_open()) {
-        std::cerr << "Error: Cannot open timestamps file: " << timestamps_path_ << std::endl;
+        std::cerr << "Error: Cannot open timestamps file: " << config_.timestamps_path << std::endl;
         return {};
     }
     std::string line;
@@ -32,23 +29,23 @@ std::vector<RGBFrame> ImageLoader::load_image_data() {
         }
     }
     ts_file.close();
-    std::cout << "--- " << timestamps.size() << "個のタイムスタンプを読み込みました ---" << std::endl;
+    std::cout << "--- Loaded " << timestamps.size() << " timestamps ---" << std::endl;
 
 
     // 2. 画像ディレクトリから画像ファイルパスを取得する
     std::vector<std::string> image_paths;
-    if (!fs::exists(images_dir_path_) || !fs::is_directory(images_dir_path_)) {
-        std::cerr << "Error: Image directory not found: " << images_dir_path_ << std::endl;
+    if (!fs::exists(config_.images_dir_path) || !fs::is_directory(config_.images_dir_path)) {
+        std::cerr << "Error: Image directory not found: " << config_.images_dir_path << std::endl;
         return {};
     }
-    for (const auto& entry : fs::directory_iterator(images_dir_path_)) {
-        if (entry.is_regular_file() && entry.path().extension() == ".png") {
+    for (const auto& entry : fs::directory_iterator(config_.images_dir_path)) {
+        if (entry.is_regular_file() && entry.path().extension() == config_.image_extension) {
             image_paths.push_back(entry.path().string());
         }
     }
     // ファイル名でソートして、タイムスタンプとの順序を保証する
     std::sort(image_paths.begin(), image_paths.end());
-    std::cout << "--- " << image_paths.size() << "個の画像ファイルを検出しました ---" << std::endl;
+    std::cout << "--- Found " << image_paths.size() << " image files with extension '" << config_.image_extension << "' ---" << std::endl;
 
 
     // 3. タイムスタンプと画像パスを紐付ける
@@ -63,6 +60,6 @@ std::vector<RGBFrame> ImageLoader::load_image_data() {
         frames.push_back({timestamps[i], image_paths[i]});
     }
 
-    std::cout << "--- " << frames.size() << "個の画像フレーム情報を正常に読み込みました ---" << std::endl;
+    std::cout << "--- Successfully loaded " << frames.size() << " image frames ---" << std::endl;
     return frames;
-}
+}   

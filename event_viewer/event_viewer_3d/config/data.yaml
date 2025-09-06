@@ -1,0 +1,17 @@
+# 1. イベントデータのHDF5ファイルへのパス
+#    (このYAMLファイルからの相対パス、または絶対パスで指定)
+event_file: "../data/events/events.h5"
+
+
+# 2. RGB画像データの設定 (オプション)
+rgb_images:
+  base_path: "../data/tum_rgbd"
+
+  # タイムスタンプファイル (base_pathからの相対パス)
+  timestamps_file: "timestamps.txt"
+
+  # 画像ディレクトリ (base_pathからの相対パス)
+  image_directory: "left/distorted"
+
+  # 画像の拡張子
+  image_extension: ".png"
