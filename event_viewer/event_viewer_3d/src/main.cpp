@@ -23,13 +23,6 @@ struct CLIConfig {
     int downsample_factor = 1;
 };
 
-// センサーの解像度
-struct Resolution {
-    int width = 0;
-    int height = 0;
-};
-
-
 // --- 関数のプロトタイプ宣言 ---
 
 CLIConfig parse_arguments(int argc, char* argv[]);
