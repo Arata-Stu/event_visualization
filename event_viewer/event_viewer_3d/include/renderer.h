@@ -5,7 +5,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "event_data.h" // EventCD, RGBFrame, Vertex
+#include "types.h" // EventCD, RGBFrame, Vertex
 #include "camera.h"
 #include "shader.h"
 #include "viewer_state.h"

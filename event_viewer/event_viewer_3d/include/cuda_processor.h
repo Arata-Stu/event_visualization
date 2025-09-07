@@ -1,5 +1,5 @@
 #pragma once
-#include "event_data.h"
+#include "types.h"
 #include <vector>
 #include <GL/glew.h>
 
