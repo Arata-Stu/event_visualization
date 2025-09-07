@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
         size_t event_index = 0; // デバッグ用にイベントのインデックスを追跡
         for (const auto& event : events_to_render) {
             // x座標が想定を超える値だったら、そのイベントの情報をコンソールに出力
-            if (event.x >= 640) { // 想定される幅の上限値でチェック
+            if (event.x >= 640 || event.y >= 480) { 
                 std::cerr << "!!! Found an unusual event at index: " << event_index << " !!!" << std::endl;
                 std::cerr << "    event.t: " << event.t << std::endl;
                 std::cerr << "    event.x: " << event.x << "  <-- This value is strange." << std::endl;
