@@ -93,13 +93,12 @@ int main(int argc, char* argv[]) {
         size_t event_index = 0; // デバッグ用にイベントのインデックスを追跡
         for (const auto& event : events_to_render) {
             // y座標が想定を超える値だったら、そのイベントの情報をコンソールに出力
-            if (event.y >= 480) { // 想定される高さの上限値でチェック
-                std::cerr << "!!! Found an unusual event at index: " << event_index << " !!!" << std::endl;
-                std::cerr << "    event.t: " << event.t << std::endl;
-                std::cerr << "    event.x: " << event.x << std::endl;
-                std::cerr << "    event.y: " << event.y << "  <-- This value is strange." << std::endl;
-                std::cerr << "    event.p: " << event.p << std::endl;
-            }
+            std::cerr << "!!! Found an unusual event at index: " << event_index << " !!!" << std::endl;
+            std::cerr << "    event.t: " << event.t << std::endl;
+            std::cerr << "    event.x: " << event.x << std::endl;
+            std::cerr << "    event.y: " << event.y << "  <-- This value is strange." << std::endl;
+            std::cerr << "    event.p: " << event.p << std::endl;
+            
 
             max_x = std::max(max_x, event.x);
             max_y = std.max(max_y, event.y);
