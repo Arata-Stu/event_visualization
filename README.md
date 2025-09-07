@@ -6,6 +6,7 @@
 docker build -t event_viewer .
 
 ## setting GUI
+xhost +
 sudo prime-select nvidia
 
 ## run docker
