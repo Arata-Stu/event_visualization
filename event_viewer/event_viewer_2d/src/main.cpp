@@ -86,30 +86,19 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        // --- データから解像度を計算 ---
         uint16_t max_x = 0;
         uint16_t max_y = 0;
         std::cout << "--- Calculating sensor resolution from data..." << std::endl;
-
-        size_t event_index = 0; // デバッグ用にイベントのインデックスを追跡
         for (const auto& event : events_to_render) {
-            // x座標が想定を超える値だったら、そのイベントの情報をコンソールに出力
-            if (event.x >= 640 || event.y >= 480) { 
-                std::cerr << "!!! Found an unusual event at index: " << event_index << " !!!" << std::endl;
-                std::cerr << "    event.t: " << event.t << std::endl;
-                std::cerr << "    event.x: " << event.x << "  <-- This value is strange." << std::endl;
-                std::cerr << "    event.y: " << event.y << std::endl;
-                std::cerr << "    event.p: " << event.p << std::endl;
-            }
-
             max_x = std::max(max_x, event.x);
             max_y = std::max(max_y, event.y);
-            event_index++;
         }
-
+        
         int width = max_x + 1;
         int height = max_y + 1;
         std::cout << "--- Detected resolution: " << width << "x" << height << " ---" << std::endl;
-
+        
         // --- レンダラーの呼び出し ---
         run_renderer(events_to_render, all_images, width, height, t_offset);
 

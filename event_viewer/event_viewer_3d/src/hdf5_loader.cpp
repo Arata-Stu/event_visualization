@@ -48,7 +48,7 @@ std::vector<EventCD> HDF5Loader::load_all_events() {
 
         std::vector<EventCD> events(num_events);
         for (size_t i = 0; i < num_events; ++i) {
-            events[i] = {x_vec[i], y_vec[i], t_vec[i], p_vec[i]};
+            events[i] = {0, x_vec[i], y_vec[i], p_vec[i], t_vec[i]};
         }
         
         std::cout << "--- イベントデータを構造体にまとめました ---" << std::endl;
