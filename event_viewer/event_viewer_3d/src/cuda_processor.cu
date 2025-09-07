@@ -51,7 +51,7 @@ __global__ void events_to_vertices(const EventCD* d_in, Vertex* d_out, int total
     double absolute_time = static_cast<double>(t_offset) + event.t;
     v.z = static_cast<float>(absolute_time - base_time);
 
-    if (event.p == 1) {
+    if (event.pol == 1) {
         v.r = POLARITY_1_R; v.g = POLARITY_1_G; v.b = POLARITY_1_B; v.a = 255;
     } else {
         v.r = POLARITY_0_R; v.g = POLARITY_0_G; v.b = POLARITY_0_B; v.a = 255;

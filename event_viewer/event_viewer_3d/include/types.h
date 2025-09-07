@@ -7,10 +7,9 @@
 
 // HDF5からのイベントデータ
 struct EventCD {
-    uint64_t p;
     uint16_t x;
     uint16_t y;
-    uint8_t pol;
+    uint8_t  pol; 
     uint64_t t;
 };
 
