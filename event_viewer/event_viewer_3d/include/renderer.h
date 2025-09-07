@@ -7,7 +7,7 @@
 
 #include "event_data.h" // EventCD, RGBFrame, Vertex
 #include "camera.h"
-#include "gl_shader.h"
+#include "shader.h"
 #include "viewer_state.h"
 
 // アプリケーション全体を管理するクラス
