@@ -45,9 +45,9 @@ private:
     double m_last_x = 0.0, m_last_y = 0.0;
 
     // シェーダー (RAII)
-    std::unique_ptr<GLShader> m_point_shader;
-    std::unique_ptr<GLShader> m_box_shader;
-    std::unique_ptr<GLShader> m_image_shader;
+    std::unique_ptr<Shader> m_point_shader;
+    std::unique_ptr<Shader> m_box_shader;
+    std::unique_ptr<Shader> m_image_shader;
 
     // OpenGLオブジェクトID
     GLuint m_point_vao = 0, m_point_vbo = 0;

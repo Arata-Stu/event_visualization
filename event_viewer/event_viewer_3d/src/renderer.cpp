@@ -48,9 +48,9 @@ void Renderer::init() {
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_PROGRAM_POINT_SIZE);
 
-    m_point_shader = std::make_unique<GLShader>("shaders/simple.vert", "shaders/simple.frag");
-    m_box_shader = std::make_unique<GLShader>("shaders/box.vert", "shaders/box.frag");
-    m_image_shader = std::make_unique<GLShader>("shaders/image.vert", "shaders/image.frag");
+    m_point_shader = std::make_unique<Shader>("shaders/simple.vert", "shaders/simple.frag");
+    m_box_shader = std::make_unique<Shader>("shaders/box.vert", "shaders/box.frag");
+    m_image_shader = std::make_unique<Shader>("shaders/image.vert", "shaders/image.frag");
 
     std::cout << "\n--- Viewer Controls ---\n"
               << "Mouse Drag: Orbit camera | Mouse Wheel: Zoom\n"
