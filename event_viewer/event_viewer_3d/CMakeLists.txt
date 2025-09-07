@@ -18,6 +18,8 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/jbeder/yaml-cpp.git
     GIT_TAG    yaml-cpp-0.8.0 # 特定のバージョンを指定
 )
+set(YAML_CPP_BUILD_TESTS OFF CACHE INTERNAL "")
+set(YAML_CPP_BUILD_TOOLS OFF CACHE INTERNAL "")
 FetchContent_MakeAvailable(yaml-cpp)
 # ------------------------------------------------------------------
 
