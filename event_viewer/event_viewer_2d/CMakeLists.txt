@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.14)
 # ★変更: プロジェクト名と使用言語を変更。CUDAは不要になります。
-project(EventViewer2D LANGUAGES CXX)
+project(EventViewer2D LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
