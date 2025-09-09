@@ -5,7 +5,7 @@
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
-#include "types.h" // EventCD, RGBFrame, Vertex
+#include "types.h" // EventCD, RGBFrame, Vertex, ColorConfig
 #include "camera.h"
 #include "shader.h"
 #include "viewer_state.h"
@@ -25,7 +25,8 @@ public:
 private:
     void init();
     void setupCallbacks();
-    void loadData(const std::vector<EventCD>& all_events, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors);
+    // 👇 この行を修正
+    void loadData(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors);
     void mainLoop();
     void renderScene();
     void cleanup();
