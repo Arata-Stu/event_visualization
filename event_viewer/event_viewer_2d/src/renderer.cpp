@@ -7,7 +7,6 @@
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 
-// ラッパー関数
 void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset) {
     try {
         Renderer app(1280, 960, "2D Event Viewer");
@@ -16,8 +15,6 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
         std::cerr << "A critical error occurred: " << e.what() << std::endl;
     }
 }
-
-// --- Renderer クラス実装 ---
 
 Renderer::Renderer(int width, int height, const std::string& title) 
     : m_width(width), m_height(height), m_title(title), m_window(nullptr) {}
@@ -97,19 +94,32 @@ void Renderer::renderScene() {
     // === 1. イベント蓄積パス (オフスクリーンレンダリング) ===
     glBindFramebuffer(GL_FRAMEBUFFER, m_event_fbo);
     glViewport(0, 0, m_sensor_width, m_sensor_height);
-    glClearColor(0.0f, 0.0f, 0.0f, 0.0f); // 透明な黒でクリア
+    glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     if (m_event_count > 0 && m_state.display_mode != DisplayMode::RGB_ONLY) {
-        // 加算合成でイベントを描画
         glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
         m_event_accum_shader->use();
         m_event_accum_shader->setFloat("u_current_time", static_cast<float>(m_current_time_us));
         m_event_accum_shader->setFloat("u_time_window", static_cast<float>(m_state.time_window_us));
         
-        glBindVertexArray(m_event_vao);
-        glDrawArrays(GL_POINTS, 0, m_event_count);
+        // CPUカリング: 描画範囲を絞り込む
+        float end_time = static_cast<float>(m_current_time_us);
+        float start_time = end_time - static_cast<float>(m_state.time_window_us);
+
+        auto start_it = std::lower_bound(m_event_timestamps.begin(), m_event_timestamps.end(), start_time);
+        auto end_it = std::lower_bound(start_it, m_event_timestamps.end(), end_time);
+
+        if (start_it != m_event_timestamps.end()) {
+            GLint first = std::distance(m_event_timestamps.begin(), start_it);
+            GLsizei count = std::distance(start_it, end_it);
+        
+            if (count > 0) {
+                glBindVertexArray(m_event_vao);
+                glDrawArrays(GL_POINTS, first, count);
+            }
+        }
     }
 
     // === 2. コンポジションパス (画面への描画) ===
@@ -118,7 +128,6 @@ void Renderer::renderScene() {
     glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     
-    // 通常のアルファブレンディングに戻す
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     m_quad_shader->use();
@@ -131,8 +140,8 @@ void Renderer::renderScene() {
 
     // 2a. 背景RGB画像の描画
     if (m_all_images_ptr && !m_all_images_ptr->empty() && m_state.display_mode != DisplayMode::EVENTS_ONLY) {
-        // 現在時刻に最も近い過去の画像を探す
-        auto it = std::upper_bound(m_all_images_ptr->begin(), m_all_images_ptr->end(), m_current_time_us, 
+        double absolute_current_time = m_current_time_us + m_base_time;
+        auto it = std::upper_bound(m_all_images_ptr->begin(), m_all_images_ptr->end(), absolute_current_time, 
             [](double time, const RGBFrame& frame){ return time < frame.timestamp; });
         if (it != m_all_images_ptr->begin()) {
             --it;
@@ -182,14 +191,16 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
     // イベントデータ
     if (!all_events.empty()) {
         m_base_time = static_cast<double>(t_offset) + all_events.front().t;
-        m_current_time_us = m_base_time;
+        m_current_time_us = 0.0; // 再生時間はベースタイムからの相対時間に
 
+        m_event_timestamps.resize(all_events.size());
         std::vector<EventVertex> vertices(all_events.size());
         for(size_t i = 0; i < all_events.size(); ++i) {
             vertices[i].x = (static_cast<float>(all_events[i].x) / sensor_width) * 2.0f - 1.0f;
             vertices[i].y = (static_cast<float>(all_events[i].y) / sensor_height) * -2.0f + 1.0f;
-            vertices[i].timestamp = static_cast<double>(t_offset) + all_events[i].t;
+            vertices[i].timestamp = static_cast<float>((static_cast<double>(t_offset) + all_events[i].t) - m_base_time);
             vertices[i].polarity = all_events[i].pol;
+            m_event_timestamps[i] = vertices[i].timestamp;
         }
         m_event_count = vertices.size();
 
@@ -202,7 +213,7 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(EventVertex), (void*)offsetof(EventVertex, x));
         glEnableVertexAttribArray(1);
-        glVertexAttribLPointer(1, 1, GL_DOUBLE, sizeof(EventVertex), (void*)offsetof(EventVertex, timestamp)); // 64bit double
+        glVertexAttribPointer(1, 1, GL_FLOAT, GL_FALSE, sizeof(EventVertex), (void*)offsetof(EventVertex, timestamp));
         glEnableVertexAttribArray(2);
         glVertexAttribPointer(2, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(EventVertex), (void*)offsetof(EventVertex, polarity));
     }
@@ -255,7 +266,7 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
     glBindVertexArray(0);
 }
 
-// --- コールバックハンドラ ---
+// --- コールバックハンドラの実装 ---
 void Renderer::onKey(int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(m_window, true);
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {

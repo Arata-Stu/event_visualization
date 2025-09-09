@@ -1,6 +1,6 @@
 #version 330 core
 layout (location = 0) in vec2 a_pos;
-layout (location = 1) in double a_timestamp;
+layout (location = 1) in float a_timestamp; 
 layout (location = 2) in uint a_polarity;
 
 uniform float u_current_time;
@@ -9,8 +9,9 @@ uniform float u_time_window;
 out float v_polarity;
 
 void main() {
-    float age = u_current_time - float(a_timestamp);
+    float age = u_current_time - a_timestamp;
 
+    // 時間窓の外にあるイベントはクリップ空間の外に飛ばして描画を棄却
     if (age < 0.0 || age > u_time_window) {
         gl_Position = vec4(2.0, 2.0, 2.0, 1.0);
     } else {

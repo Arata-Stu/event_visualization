@@ -10,12 +10,12 @@
 #include "shader.h"
 #include "viewer_state.h"
 
-// 2Dイベントレンダリング用の頂点データ構造
+// 頂点データ構造をfloatタイムスタンプに対応
 struct EventVertex {
     float x, y;
-    double timestamp;
+    float timestamp;
     uint8_t polarity;
-    uint8_t padding[3];
+    uint8_t padding[3]; // 16バイトアライメントのためのパディング
 };
 
 class Renderer {
@@ -63,6 +63,9 @@ private:
     
     size_t m_event_count = 0;
     double m_base_time = 0.0;
+
+    // CPUカリング（パフォーマンス改善）のためにタイムスタンプのリストを保持
+    std::vector<float> m_event_timestamps;
     
     void onKey(int key, int scancode, int action, int mods);
     void onMouseButton(int button, int action, int mods);
