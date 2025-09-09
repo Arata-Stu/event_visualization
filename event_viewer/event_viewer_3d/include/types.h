@@ -4,6 +4,7 @@
 #include <string>
 #include <cstdint>
 #include <filesystem>
+#include <glm/glm.hpp>
 
 // HDF5からのイベントデータ
 struct EventCD {
