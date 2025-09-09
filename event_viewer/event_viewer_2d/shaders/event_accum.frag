@@ -3,9 +3,12 @@ in float v_polarity;
 out vec4 FragColor;
 
 void main() {
+    // 極性に応じてカウンター情報をエンコード
     if (v_polarity > 0.5) {
-        FragColor = vec4(1.0, 0.2, 0.2, 1.0); // Polarity ON: Red
+        // Polarity ON: Rチャンネルに+1する
+        FragColor = vec4(1.0, 0.0, 0.0, 1.0);
     } else {
-        FragColor = vec4(0.2, 0.5, 1.0, 1.0); // Polarity OFF: Blue
+        // Polarity OFF: Gチャンネルに+1する
+        FragColor = vec4(0.0, 1.0, 0.0, 1.0);
     }
 }

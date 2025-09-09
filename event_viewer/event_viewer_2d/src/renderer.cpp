@@ -125,7 +125,7 @@ void Renderer::renderScene() {
     // === 2. コンポジションパス (画面への描画) ===
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, m_width, m_height);
-    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
     
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);

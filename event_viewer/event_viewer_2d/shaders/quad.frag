@@ -1,19 +1,34 @@
 #version 330 core
-
-// 頂点シェーダーから受け取るテクスチャ座標
 in vec2 v_tex_coord;
-
-// 最終的に出力するピクセルの色
 out vec4 FragColor;
 
-// C++側から受け取る uniform 変数
-uniform sampler2D u_texture; // 描画するテクスチャ
-uniform float u_alpha;       // 全体に適用する透明度
+uniform sampler2D u_texture; // カウンターテクスチャ
+uniform float u_alpha;       // (このシェーダーでは使わないが、念のため残す)
+
+// ★追加: 最終的に表示する色を定義
+const vec4 COLOR_ON = vec4(1.0, 0.0, 0.0, 1.0); // 赤
+const vec4 COLOR_OFF = vec4(0.0, 0.0, 1.0, 1.0); // 青
 
 void main() {
-    // 指定された座標のテクスチャの色を取得
-    vec4 tex_color = texture(u_texture, v_tex_coord);
-    
-    // テクスチャの色に、指定された透明度を乗算して出力
-    FragColor = vec4(tex_color.rgb, tex_color.a * u_alpha);
+    // カウンターテクスチャからON/OFFのカウント数を取得
+    // texture().r が ONのカウント数, texture().g が OFFのカウント数に相当
+    vec4 counts = texture(u_texture, v_tex_coord);
+
+    // イベントが全くないピクセルは透明にして背景の白を見せる
+    if (counts.r == 0.0 && counts.g == 0.0) {
+        discard; // or FragColor = vec4(0.0);
+        return;
+    }
+
+    // 多数決ロジック
+    if (counts.r > counts.g) {
+        // ONイベントが優位なら赤
+        FragColor = COLOR_ON;
+    } else if (counts.g > counts.r) {
+        // OFFイベントが優位なら青
+        FragColor = COLOR_OFF;
+    } else {
+        // 同数、またはイベントがない場合は描画しない
+        discard; // ピクセルを描画せず、背景色をそのまま表示
+    }
 }
