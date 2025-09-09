@@ -2,6 +2,7 @@
 #include "renderer.h" 
 #include "image_loader.h"
 #include "yaml-cpp/yaml.h"
+#include <glm/glm.hpp>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -9,35 +10,35 @@
 #include <algorithm>
 #include <filesystem>
 
-// 必要な前方宣言や構造体定義
+// Forward declarations
 struct EventCD;
 struct RGBFrame;
 
 namespace fs = std::filesystem;
 
-// --- 構造体の定義 ---
+// Command line configuration
 struct CLIConfig {
     fs::path config_filepath;
     int downsample_factor = 1;
 };
 
-// --- 関数のプロトタイプ宣言 ---
+// Function prototypes
 CLIConfig parse_arguments(int argc, char* argv[]);
 std::vector<EventCD> downsample_events(const std::vector<EventCD>& all_events, int factor);
 Resolution calculate_resolution(const std::vector<EventCD>& events);
 
 
-// --- main関数 ---
+// --- Main Function ---
 int main(int argc, char* argv[]) {
     try {
-        // 1. コマンドライン引数を解析
+        // 1. Parse command line arguments
         CLIConfig cli_config = parse_arguments(argc, argv);
 
-        // 2. マスター設定ファイル(YAML)を読み込む
+        // 2. Load master YAML config file
         std::cout << "--- Loading master config from: " << cli_config.config_filepath.string() << " ---" << std::endl;
         YAML::Node master_config = YAML::LoadFile(cli_config.config_filepath.string());
 
-        // 3. HDF5ファイルからイベントを読み込む
+        // 3. Load events from HDF5 file
         if (!master_config["event_file"]) {
             throw std::runtime_error("'event_file' not found in master config.");
         }
@@ -52,7 +53,7 @@ int main(int argc, char* argv[]) {
             return -1;
         }
 
-        // 4. イベントデータをダウンサンプリング
+        // 4. Downsample event data if requested
         std::vector<EventCD> events_to_render = downsample_events(all_events, cli_config.downsample_factor);
 
         if (events_to_render.empty()) {
@@ -60,7 +61,7 @@ int main(int argc, char* argv[]) {
              return -1;
         }
 
-        // 5. RGB画像データを読み込み
+        // 5. Load RGB image data if specified
         std::vector<RGBFrame> all_images;
         if (master_config["rgb_images"]) {
             YAML::Node rgb_config_node = master_config["rgb_images"];
@@ -75,12 +76,24 @@ int main(int argc, char* argv[]) {
             all_images = image_loader.load_image_data();
         }
 
-        // 6. データからセンサーの解像度を計算
+        // 6. Load color configuration from YAML, with defaults
+        glm::vec3 bg_color(1.0f, 1.0f, 1.0f);   // Default: White
+        glm::vec3 on_color(1.0f, 0.0f, 0.0f);   // Default: Red
+        glm::vec3 off_color(0.0f, 0.0f, 1.0f);  // Default: Blue
+
+        if (master_config["colors"]) {
+            YAML::Node colors = master_config["colors"];
+            if (colors["background"]) bg_color = glm::vec3(colors["background"][0].as<float>(), colors["background"][1].as<float>(), colors["background"][2].as<float>());
+            if (colors["event_on"])   on_color = glm::vec3(colors["event_on"][0].as<float>(), colors["event_on"][1].as<float>(), colors["event_on"][2].as<float>());
+            if (colors["event_off"])  off_color = glm::vec3(colors["event_off"][0].as<float>(), colors["event_off"][1].as<float>(), colors["event_off"][2].as<float>());
+        }
+
+        // 7. Calculate sensor resolution from data
         Resolution resolution = calculate_resolution(events_to_render);
         std::cout << "--- Detected resolution: " << resolution.width << "x" << resolution.height << " ---" << std::endl;
 
-        // 7. レンダラーを実行
-        run_renderer(events_to_render, all_images, resolution.width, resolution.height, t_offset);
+        // 8. Run the renderer with all loaded data and configuration
+        run_renderer(events_to_render, all_images, resolution.width, resolution.height, t_offset, bg_color, on_color, off_color);
 
     } catch (const H5::Exception& err) {
         std::cerr << "A fatal HDF5 error occurred." << std::endl;
@@ -96,7 +109,7 @@ int main(int argc, char* argv[]) {
 }
 
 
-// --- ★★★ここからが省略されていた関数の実装です★★★ ---
+// --- Function Implementations ---
 
 CLIConfig parse_arguments(int argc, char* argv[]) {
     if (argc < 2) {

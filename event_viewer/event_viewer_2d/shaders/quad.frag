@@ -2,33 +2,27 @@
 in vec2 v_tex_coord;
 out vec4 FragColor;
 
-uniform sampler2D u_texture; // カウンターテクスチャ
-uniform float u_alpha;       // (このシェーダーでは使わないが、念のため残す)
+uniform sampler2D u_texture;
 
-// ★追加: 最終的に表示する色を定義
-const vec4 COLOR_ON = vec4(1.0, 0.0, 0.0, 1.0); // 赤
-const vec4 COLOR_OFF = vec4(0.0, 0.0, 1.0, 1.0); // 青
+// ★変更: const定義を削除し、uniform変数を追加
+uniform vec3 u_on_color;
+uniform vec3 u_off_color;
 
 void main() {
-    // カウンターテクスチャからON/OFFのカウント数を取得
-    // texture().r が ONのカウント数, texture().g が OFFのカウント数に相当
     vec4 counts = texture(u_texture, v_tex_coord);
 
-    // イベントが全くないピクセルは透明にして背景の白を見せる
     if (counts.r == 0.0 && counts.g == 0.0) {
-        discard; // or FragColor = vec4(0.0);
+        discard;
         return;
     }
 
-    // 多数決ロジック
     if (counts.r > counts.g) {
-        // ONイベントが優位なら赤
-        FragColor = COLOR_ON;
+        // ONイベントが優位なら u_on_color を使う
+        FragColor = vec4(u_on_color, 1.0);
     } else if (counts.g > counts.r) {
-        // OFFイベントが優位なら青
-        FragColor = COLOR_OFF;
+        // OFFイベントが優位なら u_off_color を使う
+        FragColor = vec4(u_off_color, 1.0);
     } else {
-        // 同数、またはイベントがない場合は描画しない
-        discard; // ピクセルを描画せず、背景色をそのまま表示
+        discard;
     }
 }

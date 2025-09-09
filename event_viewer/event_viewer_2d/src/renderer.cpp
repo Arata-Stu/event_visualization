@@ -7,20 +7,34 @@
 #include <algorithm>
 #include <glm/gtc/matrix_transform.hpp>
 
-void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset) {
+// Wrapper function to start the renderer
+void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset, const glm::vec3& bg_color, const glm::vec3& on_color, const glm::vec3& off_color) {
     try {
         Renderer app(1280, 960, "2D Event Viewer");
-        app.run(all_events, all_images, width, height, t_offset);
+        app.run(all_events, all_images, width, height, t_offset, bg_color, on_color, off_color);
     } catch (const std::exception& e) {
         std::cerr << "A critical error occurred: " << e.what() << std::endl;
     }
 }
+
+// --- Renderer Class Implementation ---
 
 Renderer::Renderer(int width, int height, const std::string& title) 
     : m_width(width), m_height(height), m_title(title), m_window(nullptr) {}
 
 Renderer::~Renderer() {
     cleanup();
+}
+
+void Renderer::run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const glm::vec3& bg_color, const glm::vec3& on_color, const glm::vec3& off_color) {
+    m_bg_color = bg_color;
+    m_on_color = on_color;
+    m_off_color = off_color;
+
+    init();
+    setupCallbacks();
+    loadData(all_events, all_images, sensor_width, sensor_height, t_offset);
+    mainLoop();
 }
 
 void Renderer::init() {
@@ -63,13 +77,6 @@ void Renderer::setupCallbacks() {
     glfwSetFramebufferSizeCallback(m_window, [](GLFWwindow* w, int width, int height) { static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onFramebufferSize(width, height); });
 }
 
-void Renderer::run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset) {
-    init();
-    setupCallbacks();
-    loadData(all_events, all_images, sensor_width, sensor_height, t_offset);
-    mainLoop();
-}
-
 void Renderer::mainLoop() {
     double last_frame_time = glfwGetTime();
 
@@ -91,20 +98,20 @@ void Renderer::mainLoop() {
 }
 
 void Renderer::renderScene() {
-    // === 1. イベント蓄積パス (オフスクリーンレンダリング) ===
+    // === 1. Event Accumulation Pass (Off-screen) ===
     glBindFramebuffer(GL_FRAMEBUFFER, m_event_fbo);
     glViewport(0, 0, m_sensor_width, m_sensor_height);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
     if (m_event_count > 0 && m_state.display_mode != DisplayMode::RGB_ONLY) {
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+        glBlendFunc(GL_ONE, GL_ONE); // Use additive blending for counters
 
         m_event_accum_shader->use();
         m_event_accum_shader->setFloat("u_current_time", static_cast<float>(m_current_time_us));
         m_event_accum_shader->setFloat("u_time_window", static_cast<float>(m_state.time_window_us));
         
-        // CPUカリング: 描画範囲を絞り込む
+        // CPU Culling: determine which part of the buffer to draw
         float end_time = static_cast<float>(m_current_time_us);
         float start_time = end_time - static_cast<float>(m_state.time_window_us);
 
@@ -122,23 +129,27 @@ void Renderer::renderScene() {
         }
     }
 
-    // === 2. コンポジションパス (画面への描画) ===
+    // === 2. Composition Pass (To Screen) ===
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
     glViewport(0, 0, m_width, m_height);
-    glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+    glClearColor(m_bg_color.r, m_bg_color.g, m_bg_color.b, 1.0f); // Use configured background color
     glClear(GL_COLOR_BUFFER_BIT);
     
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA); // Normal alpha blending for composition
 
     m_quad_shader->use();
     glm::mat4 projection = m_camera.getProjectionMatrix((float)m_width / m_height);
     glm::mat4 view = m_camera.getViewMatrix();
     m_quad_shader->setMat4("projection", projection);
     m_quad_shader->setMat4("view", view);
+    
+    // Pass configured colors to the final shader
+    m_quad_shader->setVec3("u_on_color", m_on_color);
+    m_quad_shader->setVec3("u_off_color", m_off_color);
 
     glBindVertexArray(m_quad_vao);
 
-    // 2a. 背景RGB画像の描画
+    // 2a. Draw background RGB image
     if (m_all_images_ptr && !m_all_images_ptr->empty() && m_state.display_mode != DisplayMode::EVENTS_ONLY) {
         double absolute_current_time = m_current_time_us + m_base_time;
         auto it = std::upper_bound(m_all_images_ptr->begin(), m_all_images_ptr->end(), absolute_current_time, 
@@ -155,7 +166,7 @@ void Renderer::renderScene() {
         }
     }
 
-    // 2b. イベント蓄積画像の描画
+    // 2b. Draw accumulated event image
     if (m_state.display_mode != DisplayMode::RGB_ONLY) {
         m_quad_shader->setFloat("u_alpha", m_state.event_alpha);
         glActiveTexture(GL_TEXTURE0);
@@ -166,32 +177,14 @@ void Renderer::renderScene() {
     glBindVertexArray(0);
 }
 
-
-void Renderer::cleanup() {
-    glDeleteVertexArrays(1, &m_event_vao);
-    glDeleteBuffers(1, &m_event_vbo);
-    glDeleteVertexArrays(1, &m_quad_vao);
-    glDeleteBuffers(1, &m_quad_vbo);
-    
-    glDeleteFramebuffers(1, &m_event_fbo);
-    glDeleteTextures(1, &m_event_texture);
-
-    if (!m_image_textures.empty()) {
-        glDeleteTextures(m_image_textures.size(), m_image_textures.data());
-    }
-
-    if (m_window) glfwDestroyWindow(m_window);
-    glfwTerminate();
-}
-
 void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset) {
     m_sensor_width = sensor_width;
     m_sensor_height = sensor_height;
 
-    // イベントデータ
+    // Event Data
     if (!all_events.empty()) {
         m_base_time = static_cast<double>(t_offset) + all_events.front().t;
-        m_current_time_us = 0.0; // 再生時間はベースタイムからの相対時間に
+        m_current_time_us = 0.0;
 
         m_event_timestamps.resize(all_events.size());
         std::vector<EventVertex> vertices(all_events.size());
@@ -218,7 +211,7 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
         glVertexAttribPointer(2, 1, GL_UNSIGNED_BYTE, GL_FALSE, sizeof(EventVertex), (void*)offsetof(EventVertex, polarity));
     }
 
-    // 表示用クアッド
+    // Quad for displaying textures
     float quad_vertices[] = { -1.0f,  1.0f, 0.0f, 1.0f,  1.0f,  1.0f, 1.0f, 1.0f,  1.0f, -1.0f, 1.0f, 0.0f,
                               -1.0f,  1.0f, 0.0f, 1.0f,  1.0f, -1.0f, 1.0f, 0.0f, -1.0f, -1.0f, 0.0f, 0.0f };
     glGenVertexArrays(1, &m_quad_vao);
@@ -231,7 +224,7 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
     glEnableVertexAttribArray(1);
     glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
 
-    // FBOとイベント蓄積用テクスチャの生成
+    // Framebuffer Object (FBO) for accumulating events
     glGenFramebuffers(1, &m_event_fbo);
     glBindFramebuffer(GL_FRAMEBUFFER, m_event_fbo);
     glGenTextures(1, &m_event_texture);
@@ -244,7 +237,7 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
         throw std::runtime_error("Framebuffer is not complete!");
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
-    // 画像テクスチャ
+    // Image Textures
     m_all_images_ptr = &all_images;
     if (!all_images.empty()) {
         stbi_set_flip_vertically_on_load(true);
@@ -266,7 +259,24 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
     glBindVertexArray(0);
 }
 
-// --- コールバックハンドラの実装 ---
+void Renderer::cleanup() {
+    glDeleteVertexArrays(1, &m_event_vao);
+    glDeleteBuffers(1, &m_event_vbo);
+    glDeleteVertexArrays(1, &m_quad_vao);
+    glDeleteBuffers(1, &m_quad_vbo);
+    
+    glDeleteFramebuffers(1, &m_event_fbo);
+    glDeleteTextures(1, &m_event_texture);
+
+    if (!m_image_textures.empty()) {
+        glDeleteTextures(m_image_textures.size(), m_image_textures.data());
+    }
+
+    if (m_window) glfwDestroyWindow(m_window);
+    glfwTerminate();
+}
+
+// --- Callback Handlers ---
 void Renderer::onKey(int key, int scancode, int action, int mods) {
     if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) glfwSetWindowShouldClose(m_window, true);
     if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {

@@ -15,3 +15,22 @@ rgb_images:
 
   # 画像の拡張子
   image_extension: ".png"
+
+
+colors:
+  # 赤/青/白 (デフォルトテーマ)
+  background: [1.0, 1.0, 1.0] # 背景色: 白
+  event_on:   [1.0, 0.0, 0.0] # ONイベント: 赤
+  event_off:  [0.0, 0.0, 1.0] # OFFイベント: 青
+
+# colors:
+#   # 赤/青/黒 (ダークテーマ)
+#   background: [0.0, 0.0, 0.0] # 背景色: 黒
+#   event_on:   [1.0, 0.2, 0.2]
+#   event_off:  [0.2, 0.5, 1.0]
+
+# colors:
+#   # 白/黒/灰 (モノクロテーマ)
+#   background: [0.5, 0.5, 0.5] # 背景色: 灰
+#   event_on:   [1.0, 1.0, 1.0] # ONイベント: 白
+#   event_off:  [0.0, 0.0, 0.0] # OFFイベント: 黒

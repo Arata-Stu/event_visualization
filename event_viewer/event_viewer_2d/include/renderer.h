@@ -9,6 +9,7 @@
 #include "camera.h"
 #include "shader.h"
 #include "viewer_state.h"
+#include <glm/glm.hpp>
 
 // 頂点データ構造をfloatタイムスタンプに対応
 struct EventVertex {
@@ -26,7 +27,7 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset);
+    void run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const glm::vec3& bg_color, const glm::vec3& on_color, const glm::vec3& off_color);
 
 private:
     void init();
@@ -35,6 +36,10 @@ private:
     void mainLoop();
     void renderScene();
     void cleanup();
+
+    glm::vec3 m_bg_color;
+    glm::vec3 m_on_color;
+    glm::vec3 m_off_color;
 
     GLFWwindow* m_window;
     int m_width, m_height;
@@ -74,4 +79,4 @@ private:
     void onFramebufferSize(int width, int height);
 };
 
-void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset);
+void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset, const glm::vec3& bg_color, const glm::vec3& on_color, const glm::vec3& off_color);
