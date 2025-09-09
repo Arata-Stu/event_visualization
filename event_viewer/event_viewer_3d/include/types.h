@@ -39,3 +39,9 @@ struct Resolution {
     int width = 0;
     int height = 0;
 };
+
+struct ColorConfig {
+    glm::vec3 background{1.0f, 1.0f, 1.0f}; // デフォルト: 白
+    glm::vec3 event_on{1.0f, 0.0f, 0.0f};   // デフォルト: 赤
+    glm::vec3 event_off{0.0f, 0.0f, 1.0f};  // デフォルト: 青
+};

@@ -20,12 +20,12 @@ public:
     Renderer(const Renderer&) = delete;
     Renderer& operator=(const Renderer&) = delete;
 
-    void run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset);
+    void run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors);
 
 private:
     void init();
     void setupCallbacks();
-    void loadData(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset);
+    void loadData(const std::vector<EventCD>& all_events, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors);
     void mainLoop();
     void renderScene();
     void cleanup();
@@ -38,6 +38,7 @@ private:
     // 状態管理
     Camera m_camera;
     ViewerState m_state;
+    ColorConfig m_colors;
     double m_current_time_us = 0.0;
     
     // マウス入力用
@@ -67,5 +68,4 @@ private:
     void onScroll(double xoffset, double yoffset);
 };
 
-// これまでの `run_renderer` 関数は、このクラスを呼び出すラッパーとなる
-void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset);
+void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset, const ColorConfig& colors);

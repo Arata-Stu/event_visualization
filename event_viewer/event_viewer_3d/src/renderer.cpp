@@ -2,17 +2,17 @@
 #include <stb_image.h>
 
 #include "renderer.h"
-#include "cuda_processor.h" 
+#include "cuda_processor.h"
 #include <iostream>
 #include <cstdio>
 #include <stdexcept>
 #include <algorithm>
 
 // グローバルスコープにあった関数は、このラッパー関数に置き換わる
-void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset) {
+void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int width, int height, int64_t t_offset, const ColorConfig& colors) {
     try {
         Renderer app(1280, 720, "Event Viewer");
-        app.run(all_events, all_images, width, height, t_offset);
+        app.run(all_events, all_images, width, height, t_offset, colors);
     } catch (const std::exception& e) {
         std::cerr << "A critical error occurred: " << e.what() << std::endl;
     }
@@ -20,7 +20,7 @@ void run_renderer(const std::vector<EventCD>& all_events, const std::vector<RGBF
 
 // --- Renderer クラス実装 ---
 
-Renderer::Renderer(int width, int height, const std::string& title) 
+Renderer::Renderer(int width, int height, const std::string& title)
     : m_width(width), m_height(height), m_title(title), m_window(nullptr) {}
 
 Renderer::~Renderer() {
@@ -34,8 +34,8 @@ void Renderer::init() {
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
     m_window = glfwCreateWindow(m_width, m_height, m_title.c_str(), NULL, NULL);
-    if (!m_window) { 
-        glfwTerminate(); 
+    if (!m_window) {
+        glfwTerminate();
         throw std::runtime_error("Failed to create GLFW window");
     }
     glfwMakeContextCurrent(m_window);
@@ -62,24 +62,25 @@ void Renderer::init() {
 
 void Renderer::setupCallbacks() {
     // C++のラムダ式を使い、thisポインタをキャプチャせずにコールバックを設定する
-    glfwSetKeyCallback(m_window, [](GLFWwindow* w, int k, int s, int a, int m) { 
-        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onKey(k, s, a, m); 
+    glfwSetKeyCallback(m_window, [](GLFWwindow* w, int k, int s, int a, int m) {
+        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onKey(k, s, a, m);
     });
-    glfwSetMouseButtonCallback(m_window, [](GLFWwindow* w, int b, int a, int m) { 
-        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onMouseButton(b, a, m); 
+    glfwSetMouseButtonCallback(m_window, [](GLFWwindow* w, int b, int a, int m) {
+        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onMouseButton(b, a, m);
     });
-    glfwSetCursorPosCallback(m_window, [](GLFWwindow* w, double x, double y) { 
-        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onCursorPosition(x, y); 
+    glfwSetCursorPosCallback(m_window, [](GLFWwindow* w, double x, double y) {
+        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onCursorPosition(x, y);
     });
-    glfwSetScrollCallback(m_window, [](GLFWwindow* w, double x, double y) { 
-        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onScroll(x, y); 
+    glfwSetScrollCallback(m_window, [](GLFWwindow* w, double x, double y) {
+        static_cast<Renderer*>(glfwGetWindowUserPointer(w))->onScroll(x, y);
     });
 }
 
-void Renderer::run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset) {
+void Renderer::run(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors) {
+    m_colors = colors;
     init();
     setupCallbacks();
-    loadData(all_events, all_images, sensor_width, sensor_height, t_offset);
+    loadData(all_events, all_images, sensor_width, sensor_height, t_offset, colors);
     mainLoop();
 }
 
@@ -92,14 +93,14 @@ void Renderer::mainLoop() {
         last_frame_time = current_frame_time;
 
         glfwPollEvents();
-        
+
         if (!m_state.is_paused) {
             m_current_time_us += delta_time * 1000000.0 * m_state.playback_speed;
         }
 
-        glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+        glClearColor(m_colors.background.r, m_colors.background.g, m_colors.background.b, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        
+
         renderScene();
 
         glfwSwapBuffers(m_window);
@@ -143,7 +144,7 @@ void Renderer::renderScene() {
             if (image_age > 0 && image_age < m_state.time_window_us) {
                 float normalized_age = static_cast<float>(image_age / m_state.time_window_us);
                 float display_z = 1.0f - 2.0f * normalized_age;
-                
+
                 glm::mat4 image_model = model * glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, display_z));
                 m_image_shader->setMat4("model", image_model);
 
@@ -169,7 +170,7 @@ void Renderer::renderScene() {
 
 void Renderer::cleanup() {
     if (m_point_vao != 0) unregister_gl_buffer();
-    
+
     glDeleteVertexArrays(1, &m_point_vao);
     glDeleteBuffers(1, &m_point_vbo);
     glDeleteVertexArrays(1, &m_box_vao);
@@ -192,7 +193,7 @@ void Renderer::cleanup() {
     glfwTerminate();
 }
 
-void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset) {
+void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vector<RGBFrame>& all_images, int sensor_width, int sensor_height, int64_t t_offset, const ColorConfig& colors) {
     // イベントデータ
     if (!all_events.empty()) {
         m_base_time = static_cast<double>(t_offset) + all_events[0].t;
@@ -202,8 +203,8 @@ void Renderer::loadData(const std::vector<EventCD>& all_events, const std::vecto
         glBindBuffer(GL_ARRAY_BUFFER, m_point_vbo);
         glBufferData(GL_ARRAY_BUFFER, all_events.size() * sizeof(Vertex), nullptr, GL_DYNAMIC_DRAW);
         register_gl_buffer(m_point_vbo);
-        m_point_count = process_all_events(all_events, sensor_width, sensor_height, t_offset, m_base_time);
-        
+        m_point_count = process_all_events(all_events, sensor_width, sensor_height, t_offset, m_base_time, colors);
+
         glGenVertexArrays(1, &m_point_vao);
         glBindVertexArray(m_point_vao);
         glBindBuffer(GL_ARRAY_BUFFER, m_point_vbo);
@@ -290,7 +291,7 @@ void Renderer::onKey(int key, int scancode, int action, int mods) {
             std::cout << "--- Mode: Events and RGB ---\n";
         }
     }
-    
+
     if (action == GLFW_PRESS || action == GLFW_REPEAT) {
         bool updated = false;
         switch(key) {
@@ -305,7 +306,7 @@ void Renderer::onKey(int key, int scancode, int action, int mods) {
         }
 
         if (updated) {
-            printf("Speed: %.2fx, Depth: %.2f, Alpha: %.2f, Window: %.2fs\n", 
+            printf("Speed: %.2fx, Depth: %.2f, Alpha: %.2f, Window: %.2fs\n",
                 m_state.playback_speed, m_state.depth_scale, m_state.image_alpha, m_state.time_window_us / 1e6);
         }
     }

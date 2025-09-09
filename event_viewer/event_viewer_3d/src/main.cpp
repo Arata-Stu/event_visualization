@@ -2,6 +2,7 @@
 #include "renderer.h"
 #include "image_loader.h"
 #include "yaml-cpp/yaml.h"
+#include "types.h"
 #include <iostream>
 #include <string>
 #include <vector>
@@ -40,6 +41,32 @@ int main(int argc, char* argv[]) {
         // 2. マスター設定ファイル(YAML)を読み込む
         std::cout << "--- Loading master config from: " << cli_config.config_filepath.string() << " ---" << std::endl;
         YAML::Node master_config = YAML::LoadFile(cli_config.config_filepath.string());
+
+        ColorConfig color_config;
+        if (master_config["colors"]) {
+            YAML::Node colors_node = master_config["colors"];
+            if (colors_node["background"]) {
+                color_config.background = glm::vec3(
+                    colors_node["background"][0].as<float>(),
+                    colors_node["background"][1].as<float>(),
+                    colors_node["background"][2].as<float>()
+                );
+            }
+            if (colors_node["event_on"]) {
+                color_config.event_on = glm::vec3(
+                    colors_node["event_on"][0].as<float>(),
+                    colors_node["event_on"][1].as<float>(),
+                    colors_node["event_on"][2].as<float>()
+                );
+            }
+            if (colors_node["event_off"]) {
+                color_config.event_off = glm::vec3(
+                    colors_node["event_off"][0].as<float>(),
+                    colors_node["event_off"][1].as<float>(),
+                    colors_node["event_off"][2].as<float>()
+                );
+            }
+        }
 
         // 3. HDF5ファイルパスをYAMLから取得し、イベントを読み込む
         if (!master_config["event_file"]) {
@@ -87,7 +114,8 @@ int main(int argc, char* argv[]) {
         std::cout << "--- Detected resolution: " << resolution.width << "x" << resolution.height << " ---" << std::endl;
 
         // 7. レンダラーを実行
-        run_renderer(events_to_render, all_images, resolution.width, resolution.height, t_offset);
+        run_renderer(events_to_render, all_images, resolution.width, resolution.height, t_offset, color_config);
+
 
     } catch (const H5::Exception& err) {
         std::cerr << "A fatal HDF5 error occurred." << std::endl;
